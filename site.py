@@ -207,13 +207,15 @@ for(const c of chips)c.addEventListener('click',()=>{
 });
 q.addEventListener('input',apply);
 
-// Neural and network voices sound far more human than the default local ones.
-const novelty=/^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Fred|Good News|Jester|Junior|Kathy|Organ|Ralph|Superstar|Trinoids|Whisper|Wobble|Zarvox)\\b/;
-const score=v=>(/natural|neural|premium|enhanced|online/i.test(v.name)?8:0)+(/google/i.test(v.name)?4:0)+(v.localService?0:2)+(/^en[-_]US$/i.test(v.lang)?1:0);
+// Neural and network voices sound far more human than the default local ones;
+// the novelty and Eloquence voices are left out.
+// Google US English comes first when the browser has it; only the best five are offered.
+const novelty=/^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Eddy|Flo|Fred|Good News|Grandma|Grandpa|Jester|Junior|Kathy|Organ|Ralph|Reed|Rocko|Sandy|Shelley|Superstar|Trinoids|Whisper|Wobble|Zarvox)\\b/;
+const score=v=>(v.name==='Google US English'?16:0)+(/natural|neural|premium|enhanced|online/i.test(v.name)?8:0)+(/google/i.test(v.name)?4:0)+(v.localService?0:2)+(/^en[-_]US$/i.test(v.lang)?1:0);
 const voiceSelect=$('voice');
 let voice=null;
 function loadVoices(){
-  const all=speechSynthesis.getVoices().filter(v=>/^en([-_]|$)/i.test(v.lang)&&!novelty.test(v.name)).sort((a,b)=>score(b)-score(a));
+  const all=speechSynthesis.getVoices().filter(v=>/^en([-_]|$)/i.test(v.lang)&&!novelty.test(v.name)).sort((a,b)=>score(b)-score(a)).slice(0,5);
   const want=load('voice','');
   voice=all.find(v=>v.name===want)||all[0]||null;
   voiceSelect.replaceChildren(...all.map(v=>new Option(v.name+' ('+v.lang+')',v.name,false,v===voice)));
