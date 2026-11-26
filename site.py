@@ -240,7 +240,8 @@ function step(){
   while(list[pos]&&list[pos].hidden)pos++;
   const r=list[pos];
   if(!r){stop();return}
-  light(null);now.textContent='';
+  // The row lights as its word is spoken; the word itself still waits for the interval.
+  light(showWord?r:null);now.textContent='';
   at.textContent=(pos+1)+' / '+list.length;progress.max=list.length;progress.value=pos;
   // `current` keeps the utterance alive until it ends, and tells a cancelled one apart.
   const u=current=new SpeechSynthesisUtterance(r.word);u.lang='en-US';
@@ -251,7 +252,7 @@ function step(){
 function reveal(r){
   progress.value=pos+1;
   if(!showWord){pos++;step();return}
-  now.textContent=r.word;light(r);
+  now.textContent=r.word;
   timer=setTimeout(()=>{pos++;step()},1500);
 }
 if('speechSynthesis' in window){
