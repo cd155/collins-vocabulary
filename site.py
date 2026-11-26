@@ -111,8 +111,9 @@ tr.cur{background:var(--card-border)}
 #play{flex:none;width:40px;height:40px;padding:0;border:0;border-radius:999px;background:var(--foreground);color:var(--background);cursor:pointer}
 #play svg{width:20px;height:20px;fill:currentColor;vertical-align:middle}
 #now{flex:1;min-width:0;font-size:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#at,.gap{flex:none;color:var(--muted);font-size:14px;white-space:nowrap}
+#at,.gap,.voice{flex:none;color:var(--muted);font-size:14px;white-space:nowrap}
 #at{font-variant-numeric:tabular-nums}
+.voice select{max-width:180px;font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card-bg);color:var(--foreground)}
 .gap input{width:60px;font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card-bg);color:var(--foreground)}
 .cta{margin-top:32px;padding:24px;border-radius:16px;background:var(--cta-bg);color:var(--cta-fg);border:1px solid var(--card-border);text-align:center}
 .cta p{margin:0 0 14px}
@@ -140,7 +141,9 @@ td{display:block;padding:0}
 # Filters and orders the table rows, covers the definitions, reads a word aloud
 # and remembers the known words. The listening bar is for dictation: it speaks
 # the shown rows one by one, waits the interval while the learner writes, then
-# shows the word. What the page remembers is kept in localStorage and
+# shows the word. Words are read with the best English voice the browser has,
+# or the one the learner picked, since the browser's default is often robotic.
+# What the page remembers is kept in localStorage and
 # shared by the five level pages; without storage the page works the same and
 # only forgets on reload.
 SCRIPT = """
@@ -204,13 +207,29 @@ for(const c of chips)c.addEventListener('click',()=>{
 });
 q.addEventListener('input',apply);
 
+// Neural and network voices sound far more human than the default local ones.
+const novelty=/^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Fred|Good News|Jester|Junior|Kathy|Organ|Ralph|Superstar|Trinoids|Whisper|Wobble|Zarvox)\\b/;
+const score=v=>(/natural|neural|premium|enhanced|online/i.test(v.name)?8:0)+(/google/i.test(v.name)?4:0)+(v.localService?0:2)+(/^en[-_]US$/i.test(v.lang)?1:0);
+const voiceSelect=$('voice');
+let voice=null;
+function loadVoices(){
+  const all=speechSynthesis.getVoices().filter(v=>/^en([-_]|$)/i.test(v.lang)&&!novelty.test(v.name)).sort((a,b)=>score(b)-score(a));
+  const want=load('voice','');
+  voice=all.find(v=>v.name===want)||all[0]||null;
+  voiceSelect.replaceChildren(...all.map(v=>new Option(v.name+' ('+v.lang+')',v.name,false,v===voice)));
+  voiceSelect.parentElement.hidden=!all.length;
+}
+function utter(word){
+  const u=new SpeechSynthesisUtterance(word);u.lang=voice?voice.lang:'en-US';if(voice)u.voice=voice;
+  return u;
+}
+
 tbody.addEventListener('click',e=>{
   const r=e.target.closest('tr'),b=e.target.closest('button');
   if(!b){if(table.classList.contains('cover'))r.classList.toggle('open');return}
   if(b.className==='say'){
     if(playing)halt();
-    const u=new SpeechSynthesisUtterance(r.word);u.lang='en-US';
-    speechSynthesis.cancel();speechSynthesis.speak(u);
+    speechSynthesis.cancel();speechSynthesis.speak(utter(r.word));
     return;
   }
   const on=!known.has(r.word);
@@ -244,7 +263,7 @@ function step(){
   light(showWord?r:null);now.textContent='';
   at.textContent=(pos+1)+' / '+list.length;progress.max=list.length;progress.value=pos;
   // `current` keeps the utterance alive until it ends, and tells a cancelled one apart.
-  const u=current=new SpeechSynthesisUtterance(r.word);u.lang='en-US';
+  const u=current=utter(r.word);
   u.onend=()=>{if(u===current)timer=setTimeout(reveal,seconds()*1000,r)};
   u.onerror=()=>{if(u===current)halt()};
   speechSynthesis.cancel();speechSynthesis.speak(u);
@@ -257,6 +276,9 @@ function reveal(r){
 }
 if('speechSynthesis' in window){
   player.hidden=false;
+  loadVoices();
+  speechSynthesis.addEventListener('voiceschanged',loadVoices);
+  voiceSelect.addEventListener('change',()=>{save('voice',voiceSelect.value);loadVoices()});
   gap.value=load('gap',5);
   gap.addEventListener('change',()=>save('gap',seconds()));
   toggle('showWord','showWord',load('showWord',true),v=>{showWord=v;if(!v){light(null);now.textContent=''}});
@@ -425,6 +447,7 @@ def level_page(stars: int, words: list) -> str:
 <span id="at"></span>
 <label class="gap">间隔 <input id="gap" type="number" min="0" max="60" step="1" value="5" inputmode="numeric"> 秒</label>
 <button class="pill check" type="button" id="showWord" aria-pressed="true">显示单词</button>
+<label class="voice">声音 <select id="voice"></select></label>
 </div>
 <script>{SCRIPT}</script>"""
     return page(
